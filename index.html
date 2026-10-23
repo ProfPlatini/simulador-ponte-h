@@ -1,0 +1,1316 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Montador de Ponte H</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: bancada virtual (placa verde) à esquerda e painel do passo à direita; no celular, bancada em cima e painel embaixo. */
+:root {
+  --bg: #e8edf0;
+  --surface: #ffffff;
+  --ink: #12202c;
+  --muted: #566775;
+  --line: #cdd7de;
+  --accent: #0a6c9e;
+  --accent-ink: #ffffff;
+  --accent-soft: #dcecf5;
+  --ok: #167a43;
+  --ok-soft: #dff3e7;
+  --warn: #8a5300;
+  --warn-soft: #fbefd5;
+  --bad: #b3261e;
+  --bad-soft: #fbe3e0;
+  --board: #1d5a45;
+  --board-2: #2a7a60;
+  --silk: #e6f2ec;
+  --tray: rgba(10, 30, 24, .88);
+  --font-display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e151b; --surface: #16202a; --ink: #e5edf2; --muted: #93a4b1; --line: #29384a;
+    --accent: #55b6e8; --accent-ink: #06202f; --accent-soft: #15374a;
+    --ok: #4cd08a; --ok-soft: #123524; --warn: #f0b54d; --warn-soft: #3a2b0d;
+    --bad: #ff8a80; --bad-soft: #43201d;
+    --board: #133a2d; --board-2: #1f5946; --silk: #d8ece3; --tray: rgba(4, 16, 12, .9);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e151b; --surface: #16202a; --ink: #e5edf2; --muted: #93a4b1; --line: #29384a;
+  --accent: #55b6e8; --accent-ink: #06202f; --accent-soft: #15374a;
+  --ok: #4cd08a; --ok-soft: #123524; --warn: #f0b54d; --warn-soft: #3a2b0d;
+  --bad: #ff8a80; --bad-soft: #43201d;
+  --board: #133a2d; --board-2: #1f5946; --silk: #d8ece3; --tray: rgba(4, 16, 12, .9);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 var(--font-body);
+  padding-block: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  -webkit-text-size-adjust: 100%;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.app { height: 100%; display: flex; flex-direction: column; gap: 8px; padding-block: 10px; min-height: 0; }
+
+/* Cabeçalho */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.brand { min-width: 0; }
+.eyebrow { font: 500 11px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 0; font: 700 28px/1 var(--font-display); letter-spacing: .01em; text-wrap: balance; }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+.pill { font: 500 12px/1 var(--font-mono); padding: 7px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.link-btn { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 13px; color: var(--muted); }
+.link-btn:hover { color: var(--ink); border-color: var(--muted); }
+
+/* Trilha de passos */
+.steps { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.step-chip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px 5px 6px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface);
+  font-size: 12.5px; color: var(--muted); white-space: nowrap;
+}
+.step-chip .n { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 500 11px/1 var(--font-mono); background: var(--bg); color: var(--muted); }
+.step-chip.done { color: var(--ink); }
+.step-chip.done .n { background: var(--ok); color: #fff; }
+.step-chip.cur { border-color: var(--accent); color: var(--ink); box-shadow: 0 0 0 2px var(--accent-soft); }
+.step-chip.cur .n { background: var(--accent); color: var(--accent-ink); }
+.step-chip:disabled { opacity: .45; cursor: not-allowed; }
+
+/* Área de trabalho */
+.work { flex: 1; min-height: 0; display: grid; gap: 10px; grid-template-rows: minmax(40dvh, 1fr) auto; }
+.stage { position: relative; min-height: 0; border-radius: 12px; overflow: hidden; background: var(--board); border: 1px solid var(--board-2); display: flex; flex-direction: column; }
+.stage.short::after { content: ''; position: absolute; inset: 0; border: 5px solid #ff3b30; border-radius: 12px; pointer-events: none; z-index: 6; }
+.bar { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px; background: var(--tray); }
+.bar-title { font: 500 11px/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.7); white-space: nowrap; }
+.canvas { position: relative; flex: 1 1 0; min-height: 0; }
+#board { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; user-select: none; -webkit-user-select: none; display: block; }
+.tools { display: flex; gap: 5px; flex-wrap: nowrap; }
+.tbtn { min-width: 38px; height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: #fff; font-size: 13.5px; white-space: nowrap; }
+.tbtn:hover { background: rgba(255,255,255,.18); }
+.tbtn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.tbtn:disabled { opacity: .4; cursor: not-allowed; }
+.status { pointer-events: none; position: absolute; left: 8px; top: 8px; right: 8px; width: fit-content; max-width: calc(100% - 16px); z-index: 3; padding: 7px 11px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 500; }
+.toast { pointer-events: none; position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 4; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; line-height: 1.4; background: var(--surface); color: var(--ink); border-left: 5px solid var(--muted); box-shadow: 0 6px 20px rgba(0,0,0,.35); }
+.toast.bad { border-left-color: var(--bad); }
+.toast.ok { border-left-color: var(--ok); }
+.toast.short { background: var(--bad); color: #fff; border-left-color: #fff; font-weight: 600; }
+.tray { flex: 0 0 auto; z-index: 3; display: flex; gap: 8px; overflow-x: auto; padding: 8px; background: var(--tray); scrollbar-width: thin; }
+.part-btn { flex: 0 0 auto; width: 104px; padding: 6px 6px 7px; border-radius: 10px; border: 2px solid rgba(255,255,255,.18); background: rgba(255,255,255,.07); color: #fff; text-align: center; }
+.part-btn svg { width: 100%; height: 44px; display: block; }
+.part-btn .pn { display: block; font: 500 12px/1.2 var(--font-mono); margin-top: 2px; }
+.part-btn .ps { display: block; font-size: 10.5px; line-height: 1.2; opacity: .75; margin-top: 2px; }
+.part-btn[aria-pressed="true"] { border-color: #ffd447; background: rgba(255, 212, 71, .18); }
+
+/* Painel do passo */
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; overflow: auto; max-height: 36dvh; min-height: 0; display: flex; flex-direction: column; gap: 12px; }
+.panel h2 { margin: 2px 0 0; font: 700 25px/1.05 var(--font-display); text-wrap: balance; }
+.panel p { margin: 0; max-width: 62ch; }
+.todo { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; }
+.todo b { display: block; font: 500 11px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.list h3 { margin: 0 0 3px; font: 500 11px/1.3 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.row { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); font-size: 14px; min-height: 40px; }
+button.row:hover { border-color: var(--accent); }
+.row .ck { flex: 0 0 22px; height: 22px; border-radius: 50%; border: 2px solid var(--line); display: grid; place-items: center; font-size: 13px; color: transparent; }
+.row.done { background: var(--ok-soft); border-color: transparent; }
+.row.done .ck { background: var(--ok); border-color: var(--ok); color: #fff; }
+.row.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.row .arrow { color: var(--muted); }
+.row .tx { min-width: 0; overflow-wrap: anywhere; }
+.mono { font-family: var(--font-mono); font-size: 12.5px; }
+details.why summary { cursor: pointer; font-weight: 600; font-size: 14px; color: var(--accent); }
+details.why p { margin-top: 6px; }
+details.dica { border: 1px dashed var(--line); border-radius: 9px; padding: 8px 10px; }
+details.dica summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+details.dica p { margin-top: 6px; color: var(--muted); font-size: 14px; }
+.nav { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: center; position: sticky; bottom: -14px; background: var(--surface); padding: 10px 0 2px; margin-top: auto; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: 10px 16px; font-weight: 600; min-height: 42px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.nav .hint { grid-column: 1 / -1; order: 3; font-size: 12.5px; color: var(--muted); min-width: 0; }
+.nav .primary { width: 100%; }
+
+/* Fonte */
+.psu { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.psu .disp { font: 500 30px/1 var(--font-mono); background: #0b1a12; color: #4cff9a; padding: 10px 14px; border-radius: 8px; min-width: 112px; text-align: center; letter-spacing: .04em; }
+.psu .disp.over { color: #ff7a6e; }
+.psu .btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.psu .btns button { min-width: 52px; }
+.msg { padding: 8px 10px; border-radius: 9px; font-size: 13.5px; }
+.msg.ok { background: var(--ok-soft); color: var(--ok); }
+.msg.warn { background: var(--warn-soft); color: var(--warn); }
+.msg.bad { background: var(--bad-soft); color: var(--bad); }
+
+/* Teste */
+.test-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.big-sw { padding: 14px 8px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); font: 700 22px/1 var(--font-display); letter-spacing: .04em; }
+.big-sw small { display: block; font: 400 11.5px/1.2 var(--font-body); letter-spacing: 0; color: var(--muted); margin-top: 4px; }
+.big-sw[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.big-sw[aria-pressed="true"] small { color: inherit; opacity: .85; }
+.readout { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.cell { border: 1px solid var(--line); border-radius: 9px; padding: 8px 10px; min-width: 0; }
+.cell .k { font: 500 11px/1.3 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.cell .v { font: 500 18px/1.3 var(--font-mono); font-variant-numeric: tabular-nums; }
+.led-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--line); }
+.led-dot.g.on { background: #27c24c; box-shadow: 0 0 10px #27c24c; }
+.led-dot.r.on { background: #e5392f; box-shadow: 0 0 10px #e5392f; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip { font: 500 12px/1 var(--font-mono); padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line); color: var(--muted); }
+.chip.on { background: var(--ok-soft); color: var(--ok); border-color: transparent; }
+.table-test { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table-test td { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.table-test td:last-child { text-align: right; font-weight: 600; color: var(--ok); }
+.q-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; font-size: 14px; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+.check input { margin-top: 4px; width: 18px; height: 18px; }
+
+/* Figura dos terminais */
+.fig { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.fig svg { width: 150px; height: auto; flex: 0 0 auto; }
+
+/* SVG da bancada */
+.term-hit { fill: transparent; cursor: pointer; }
+.term-dot { fill: #f1c75b; stroke: #7a5b00; stroke-width: 2; pointer-events: none; }
+.term-lbl { fill: var(--silk); font: 500 10px var(--font-mono); text-anchor: middle; pointer-events: none; }
+.silk { fill: var(--silk); font-family: var(--font-mono); pointer-events: none; }
+.slot { fill: rgba(255,255,255,.05); stroke: rgba(255,255,255,.4); stroke-width: 2; stroke-dasharray: 6 5; }
+.slot.want { stroke: #ffd447; stroke-width: 3; fill: rgba(255, 212, 71, .12); }
+.slot.ready { cursor: pointer; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .25; } }
+@keyframes ringpulse { 0% { r: 11; opacity: 1; } 100% { r: 24; opacity: 0; } }
+.ring-hint { fill: none; stroke: #ffd447; stroke-width: 4; animation: ringpulse 1.1s ease-out infinite; pointer-events: none; }
+.ring-sel { fill: none; stroke: #fff; stroke-width: 4; pointer-events: none; }
+.bar-hint { animation: pulse 1s ease-in-out infinite; }
+.wire-hit { fill: none; stroke: transparent; stroke-width: 16; cursor: pointer; pointer-events: stroke; }
+@keyframes spincw { to { transform: rotate(360deg); } }
+@keyframes spinccw { to { transform: rotate(-360deg); } }
+.spin-cw { animation: spincw .9s linear infinite; }
+.spin-ccw { animation: spinccw .9s linear infinite; }
+.glow { filter: drop-shadow(0 0 7px currentColor); }
+@media (prefers-reduced-motion: reduce) {
+  .ring-hint, .bar-hint { animation: none; opacity: 1; }
+  .spin-cw, .spin-ccw { animation: none; }
+}
+
+/* Telas largas */
+@media (min-width: 900px) {
+  .work { grid-template-columns: minmax(0, 1fr) 410px; grid-template-rows: minmax(0, 1fr); }
+  .panel { max-height: none; }
+  .work { grid-template-rows: minmax(0, 1fr); }
+  h1 { font-size: 32px; }
+}
+@media (max-width: 520px) {
+  h1 { font-size: 23px; }
+  .eyebrow { display: none; }
+  .top { flex-wrap: nowrap; }
+  .link-btn .lbl { display: none; }
+  .link-btn.armed .lbl { display: inline; }
+  .link-btn { font-size: 15px; padding: 6px 12px; }
+  .bar-title { display: none; }
+  .bar { justify-content: flex-end; }
+  .tbtn { min-width: 36px; padding: 0 9px; }
+  .status { font-size: 12.5px; }
+  .part-btn { width: 84px; padding: 3px 4px 4px; border-width: 2px; }
+  .part-btn svg { height: 28px; }
+  .part-btn .pn { font-size: 11px; margin-top: 0; }
+  .part-btn .ps { display: none; }
+  .tray { padding: 6px 8px; gap: 6px; }
+}
+</style>
+
+<style>html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="eyebrow">SELAN 2 · Atividade prática · Revisadeira</div>
+      <h1>Montador de Ponte H</h1>
+    </div>
+    <div class="top-actions">
+      <span class="pill" id="progress">Passo 1 de 13</span>
+      <button class="link-btn" id="btnReset" type="button" aria-label="Recomeçar a montagem"><span class="ic">↺</span><span class="lbl">Recomeçar</span></button>
+    </div>
+  </header>
+
+  <nav class="steps" id="steps" aria-label="Passos da montagem"></nav>
+
+  <div class="work">
+    <section class="stage" id="stage" aria-label="Bancada virtual">
+      <div class="bar">
+        <span class="bar-title">Bancada virtual</span>
+        <div class="tools">
+          <button class="tbtn" id="tHint" type="button" aria-pressed="true" title="Destacar a próxima ligação">Dica</button>
+          <button class="tbtn" id="tZoomIn" type="button" aria-label="Aproximar">+</button>
+          <button class="tbtn" id="tZoomOut" type="button" aria-label="Afastar">−</button>
+          <button class="tbtn" id="tFit" type="button" title="Ver a bancada inteira">Tudo</button>
+          <button class="tbtn" id="tUndo" type="button" title="Desfazer a última ação">Desfazer</button>
+        </div>
+      </div>
+      <div class="canvas" id="canvas">
+        <svg id="board" viewBox="0 0 760 1000" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Bancada virtual com a ponte H"></svg>
+        <div class="status" id="status" hidden></div>
+        <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+      </div>
+      <div class="tray" id="tray" hidden aria-label="Gaveta de peças"></div>
+    </section>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+</div>
+<script>
+/* ========= DADOS DO CIRCUITO: peças, terminais e redes elétricas =========
+   Sistema de coordenadas do SVG: viewBox 0 0 760 1000.
+   Cada peça tem um "slot" (lugar na bancada) e terminais com posição absoluta. */
+
+const BOARD = { w: 760, h: 1000 };
+
+/* Tipos de peça que existem na gaveta */
+const TYPES = {
+  TIP122: { name: 'TIP122',          sub: 'transistor de potência', kind: 'tr220' },
+  BC337:  { name: 'BC337',           sub: 'transistor pequeno',     kind: 'tr92'  },
+  R470:   { name: '470 Ω',           sub: 'amarelo · violeta · marrom',   kind: 'res', bands: ['#e8c200', '#7a3fb0', '#7b4a1e'] },
+  R1K:    { name: '1 kΩ',            sub: 'marrom · preto · vermelho',    kind: 'res', bands: ['#7b4a1e', '#111111', '#d02020'] },
+  R2K2:   { name: '2,2 kΩ',          sub: 'vermelho · vermelho · vermelho', kind: 'res', bands: ['#d02020', '#d02020', '#d02020'] },
+  R4K7:   { name: '4,7 kΩ',          sub: 'amarelo · violeta · vermelho', kind: 'res', bands: ['#e8c200', '#7a3fb0', '#d02020'] },
+  R10K:   { name: '10 kΩ',           sub: 'marrom · preto · laranja',     kind: 'res', bands: ['#7b4a1e', '#111111', '#e8761a'] },
+  LEDV:   { name: 'LED verde',       sub: 'indica FRENTE',          kind: 'led', color: '#27c24c' },
+  LEDR:   { name: 'LED vermelho',    sub: 'indica RÉ',              kind: 'led', color: '#e5392f' },
+  MOTOR:  { name: 'Motor DC 3–6 V',  sub: 'mini motor da revisadeira', kind: 'motor' },
+  BOTAO:  { name: 'Botão',           sub: 'push button',            kind: 'sw' },
+  FONTE:  { name: 'Fonte',           sub: '7,5 V',                  kind: 'psu' }
+};
+
+/* Ordem em que os tipos aparecem na gaveta */
+const BIN_ORDER = ['TIP122', 'BC337', 'R470', 'R1K', 'R2K2', 'R4K7', 'R10K', 'LEDV', 'LEDR', 'MOTOR', 'BOTAO'];
+
+/* Peças (slots). cx, cy = centro do corpo. terms = {terminal: [x, y]} */
+const PARTS = {
+  J1: { type: 'FONTE',  cx: 440, cy: 38,  pre: true,  terms: { pos: [415, 82], neg: [465, 82] } },
+
+  SW1: { type: 'BOTAO', cx: 125, cy: 207, caption: 'FRENTE', terms: { a: [105, 170], b: [145, 170] } },
+  SW2: { type: 'BOTAO', cx: 635, cy: 207, caption: 'RÉ',     terms: { a: [615, 170], b: [655, 170] } },
+
+  Q1: { type: 'TIP122', cx: 235, cy: 340, terms: { B: [201, 400], C: [235, 400], E: [269, 400] } },
+  Q2: { type: 'TIP122', cx: 525, cy: 340, terms: { B: [491, 400], C: [525, 400], E: [559, 400] } },
+  Q3: { type: 'TIP122', cx: 235, cy: 820, terms: { B: [201, 880], C: [235, 880], E: [269, 880] } },
+  Q4: { type: 'TIP122', cx: 525, cy: 820, terms: { B: [491, 880], C: [525, 880], E: [559, 880] } },
+
+  R1: { type: 'R1K',  cx: 125, cy: 450, terms: { in: [80, 450],  out: [170, 450] } },
+  R2: { type: 'R1K',  cx: 635, cy: 450, terms: { out: [590, 450], in: [680, 450] } },
+  R3: { type: 'R4K7', cx: 110, cy: 880, terms: { in: [65, 880],  out: [155, 880] } },
+  R4: { type: 'R4K7', cx: 650, cy: 880, terms: { out: [605, 880], in: [695, 880] } },
+
+  Q5: { type: 'BC337', cx: 125, cy: 540, terms: { C: [95, 580],  B: [125, 580], E: [155, 580] } },
+  Q6: { type: 'BC337', cx: 635, cy: 540, terms: { C: [605, 580], B: [635, 580], E: [665, 580] } },
+  R5: { type: 'R10K', cx: 125, cy: 650, terms: { in: [80, 650],  out: [170, 650] } },
+  R6: { type: 'R10K', cx: 635, cy: 650, terms: { in: [590, 650], out: [680, 650] } },
+
+  M1: { type: 'MOTOR', cx: 380, cy: 515, terms: { p: [350, 575], n: [410, 575] } },
+  R7: { type: 'R470',  cx: 380, cy: 650, terms: { in: [335, 650], out: [425, 650] } },
+  D1: { type: 'LEDV',  cx: 330, cy: 740, terms: { A: [315, 780], K: [345, 780] } },
+  D2: { type: 'LEDR',  cx: 430, cy: 740, terms: { A: [415, 780], K: [445, 780] } }
+};
+
+/* Nome legível de cada terminal, usado nas mensagens */
+const TERM_LABEL = {
+  TIP122: { B: 'base (B)', C: 'coletor (C)', E: 'emissor (E)' },
+  BC337:  { B: 'base (B)', C: 'coletor (C)', E: 'emissor (E)' },
+  motor:  { p: 'terminal +', n: 'terminal −' },
+  fonte:  { pos: 'saída +7,5 V', neg: 'saída GND' },
+  led:    { A: 'anodo (A)', K: 'catodo (K)' },
+  sw:     { a: 'terminal de cima (ligado ao +)', b: 'terminal de saída' },
+  res:    { in: 'terminal de entrada', out: 'terminal de saída' }
+};
+
+/* Trilhos e barramentos (todos os pontos de um trilho são o mesmo ponto elétrico) */
+const XS = [110, 190, 270, 350, 430, 510, 590, 670];
+const YS = [200, 295, 390, 485, 580, 675, 770, 865];
+const RAILS = {
+  VCC: { label: '+7,5 V', color: '#e03a2f', bar: [70, 130, 690, 130], dots: XS.map((x, i) => ['VC' + (i + 1), x, 130]) },
+  GND: { label: 'GND',    color: '#222222', bar: [70, 940, 690, 940], bar2: [560, 60, 690, 60],
+         dots: XS.map((x, i) => ['GN' + (i + 1), x, 940]).concat([['GT1', 590, 60], ['GT2', 660, 60]]) },
+  FRE: { label: 'FRENTE', color: '#2f7df6', bar: [30, 180, 30, 885],  dots: YS.map((y, i) => ['FR' + (i + 1), 30, y]) },
+  RE:  { label: 'RÉ',     color: '#f26d1f', bar: [730, 180, 730, 885], dots: YS.map((y, i) => ['RE' + (i + 1), 730, y]) }
+};
+
+/* Redes elétricas corretas (a "verdade" do circuito da folha de atividade).
+   rail: nome do trilho que já liga todos os pontos desse nome. */
+const NETS = {
+  VCC: { label: 'trilho +7,5 V', color: '#e03a2f', rail: 'VCC', terms: ['J1.pos', 'Q1.C', 'Q2.C', 'SW1.a', 'SW2.a'] },
+  GND: { label: 'trilho GND',    color: '#222222', rail: 'GND', terms: ['J1.neg', 'Q3.E', 'Q4.E', 'Q5.E', 'Q6.E'] },
+  NA:  { label: 'ponto A (lado + do motor)', color: '#f2c200', terms: ['Q1.E', 'Q3.C', 'M1.p', 'R7.in'] },
+  NB:  { label: 'ponto B (lado − do motor)', color: '#b14de0', terms: ['Q2.E', 'Q4.C', 'M1.n', 'D1.K', 'D2.A'] },
+  NX:  { label: 'ponto dos LEDs',            color: '#f0f0f0', terms: ['R7.out', 'D1.A', 'D2.K'] },
+  B1:  { label: 'base de Q1', color: '#19b5a5', terms: ['Q1.B', 'R1.out', 'Q5.C'] },
+  B2:  { label: 'base de Q2', color: '#19b5a5', terms: ['Q2.B', 'R2.out', 'Q6.C'] },
+  B3:  { label: 'base de Q3', color: '#19b5a5', terms: ['Q3.B', 'R3.out'] },
+  B4:  { label: 'base de Q4', color: '#19b5a5', terms: ['Q4.B', 'R4.out'] },
+  B5:  { label: 'base de Q5', color: '#19b5a5', terms: ['Q5.B', 'R5.out'] },
+  B6:  { label: 'base de Q6', color: '#19b5a5', terms: ['Q6.B', 'R6.out'] },
+  FRE: { label: 'linha FRENTE', color: '#2f7df6', rail: 'FRE', terms: ['SW1.b', 'R1.in', 'R4.in', 'R6.in'] },
+  RE:  { label: 'linha RÉ',     color: '#f26d1f', rail: 'RE',  terms: ['SW2.b', 'R2.in', 'R3.in', 'R5.in'] }
+};
+/* ========= PASSOS DA MONTAGEM GUIADA =========
+   place: peças que precisam ser colocadas nesse passo
+   items: ligações pedidas (from -> to). "to" pode ser um terminal ("Q1.E") ou um trilho (VCC, GND, FRE, RE). */
+
+const STEPS = [
+  {
+    id: 'intro', short: 'Início', title: 'Missão na revisadeira',
+    why: 'Na Tecelagem Nova Princesa, o motor da revisadeira precisa girar nos dois sentidos: um botão para FRENTE e outro para RÉ. Para isso você vai montar uma ponte H com 4 transistores TIP122, mais dois BC337 que impedem o curto-circuito.',
+    how: 'A montagem tem 11 passos curtos. Em cada um, o programa diz qual peça colocar e quais terminais ligar. No fim, você aperta os botões e vê o motor girar.',
+    place: [], items: []
+  },
+  {
+    id: 'fonte', short: 'Fonte', title: 'Ligar a fonte', extra: 'fonte',
+    why: 'A fonte de bancada alimenta o circuito inteiro. Antes de ligar qualquer coisa, ajuste a tensão em 7,5 V. Nunca passe de 8 V, porque os componentes podem esquentar e queimar.',
+    how: 'Ajuste a tensão. Depois ligue a saída + no trilho vermelho (+7,5 V) e a saída GND no trilho preto (GND).',
+    dica: 'Toque no terminal da fonte e depois em qualquer ponto do trilho da mesma cor. Todos os pontos de um trilho são o mesmo ponto elétrico. O trilho preto de cima e o de baixo são o mesmo GND.',
+    place: [],
+    items: [{ from: 'J1.pos', to: 'VCC' }, { from: 'J1.neg', to: 'GND' }]
+  },
+  {
+    id: 'tip', short: 'TIP122', title: 'Colocar os 4 transistores TIP122', extra: 'tip',
+    why: 'Os quatro TIP122 são as chaves da ponte H: Q1 e Q2 em cima, Q3 e Q4 embaixo. Cada um tem três terminais: base (B), coletor (C) e emissor (E).',
+    how: 'Toque no TIP122 na gaveta e depois em cada lugar marcado: Q1, Q2, Q3 e Q4.',
+    dica: 'Com a face de letras virada para você e os terminais para baixo, da esquerda para a direita a ordem é B, C, E.',
+    place: ['Q1', 'Q2', 'Q3', 'Q4'], items: []
+  },
+  {
+    id: 'pot', short: 'Alimentação', title: 'Alimentar a ponte',
+    why: 'O coletor dos transistores de cima (Q1 e Q2) recebe o +7,5 V. O emissor dos de baixo (Q3 e Q4) volta para o GND. Assim a corrente tem um caminho de descida pelo motor.',
+    how: 'Ligue o coletor de Q1 e de Q2 no trilho vermelho. Ligue o emissor de Q3 e de Q4 no trilho preto.',
+    dica: 'Fios vermelhos vão no +7,5 V e fios pretos vão no GND. É uma boa prática de bancada.',
+    place: [],
+    items: [{ from: 'Q1.C', to: 'VCC' }, { from: 'Q2.C', to: 'VCC' }, { from: 'Q3.E', to: 'GND' }, { from: 'Q4.E', to: 'GND' }]
+  },
+  {
+    id: 'h', short: 'Formar o H', title: 'Formar o H',
+    why: 'Em cada lado, o emissor do transistor de cima encontra o coletor do transistor de baixo. Esse encontro é o ponto A, à esquerda, e o ponto B, à direita. O motor vai ficar entre A e B, formando a barra do H.',
+    how: 'Ligue o emissor de Q1 ao coletor de Q3. Depois ligue o emissor de Q2 ao coletor de Q4.',
+    dica: 'Lado esquerdo: Q1 e Q3. Lado direito: Q2 e Q4. Nunca ligue um lado no outro.',
+    place: [],
+    items: [{ from: 'Q1.E', to: 'Q3.C' }, { from: 'Q2.E', to: 'Q4.C' }]
+  },
+  {
+    id: 'motor', short: 'Motor', title: 'Ligar o motor',
+    why: 'O motor fica na barra do H, entre o ponto A e o ponto B. Quando a corrente entra por A e sai por B, o motor gira num sentido. Se entrar por B e sair por A, gira no sentido contrário.',
+    how: 'Coloque o motor no lugar M1. Ligue o terminal + no ponto A (emissor de Q1) e o terminal − no ponto B (emissor de Q2).',
+    dica: 'O ponto A é o emissor de Q1 (que já está ligado ao coletor de Q3). O ponto B é o emissor de Q2.',
+    place: ['M1'],
+    items: [{ from: 'M1.p', to: 'Q1.E' }, { from: 'M1.n', to: 'Q2.E' }]
+  },
+  {
+    id: 'leds', short: 'LEDs', title: 'LEDs indicadores de sentido',
+    why: 'Os dois LEDs ficam em sentidos opostos, em paralelo com o motor. O verde acende quando a corrente vai de A para B (FRENTE). O vermelho acende quando vai de B para A (RÉ). O resistor de 470 Ω limita a corrente dos LEDs.',
+    how: 'Coloque R7 (470 Ω), D1 (verde) e D2 (vermelho). Ligue R7 ao ponto A. A saída de R7 vai no anodo de D1 e no catodo de D2. O catodo de D1 e o anodo de D2 vão no ponto B.',
+    dica: 'Os dois LEDs ficam virados em sentidos opostos. Anodo é o terminal do lado positivo.',
+    place: ['R7', 'D1', 'D2'],
+    items: [
+      { from: 'R7.in', to: 'Q1.E' }, { from: 'D1.A', to: 'R7.out' }, { from: 'D2.K', to: 'R7.out' },
+      { from: 'D1.K', to: 'Q2.E' }, { from: 'D2.A', to: 'Q2.E' }
+    ]
+  },
+  {
+    id: 'base', short: 'Bases', title: 'Resistores de base dos TIP122',
+    why: 'Cada resistor limita a corrente que entra na base do transistor, que é o terminal de comando. Os de cima (R1 e R2) são de 1 kΩ. Os de baixo (R3 e R4) são de 4,7 kΩ.',
+    how: 'Coloque R1 e R2 (1 kΩ) e R3 e R4 (4,7 kΩ). Ligue o terminal de saída de cada um na base do transistor correspondente.',
+    dica: 'Confira as faixas de cor. 1 kΩ é marrom, preto, vermelho. 4,7 kΩ é amarelo, violeta, vermelho.',
+    place: ['R1', 'R2', 'R3', 'R4'],
+    items: [{ from: 'R1.out', to: 'Q1.B' }, { from: 'R2.out', to: 'Q2.B' }, { from: 'R3.out', to: 'Q3.B' }, { from: 'R4.out', to: 'Q4.B' }]
+  },
+  {
+    id: 'inter', short: 'Intertravamento', title: 'Intertravamento com Q5 e Q6',
+    why: 'Se Q1 e Q3 conduzissem juntos, a fonte entraria em curto. Q5 e Q6 impedem isso: quando o botão do lado oposto é apertado, eles puxam a base do transistor de cima para o GND e o desligam.',
+    how: 'Coloque Q5 e Q6 (BC337) e R5 e R6 (10 kΩ). Ligue o coletor de Q5 na base de Q1 e o coletor de Q6 na base de Q2. Os emissores vão no GND. A saída de R5 vai na base de Q5, e a de R6 na base de Q6.',
+    dica: 'No BC337, com a face plana virada para você, a ordem é C, B, E. O desenho já mostra as letras.',
+    place: ['Q5', 'Q6', 'R5', 'R6'],
+    items: [
+      { from: 'Q5.C', to: 'Q1.B' }, { from: 'Q6.C', to: 'Q2.B' },
+      { from: 'Q5.E', to: 'GND' }, { from: 'Q6.E', to: 'GND' },
+      { from: 'R5.out', to: 'Q5.B' }, { from: 'R6.out', to: 'Q6.B' }
+    ]
+  },
+  {
+    id: 'botoes', short: 'Botões', title: 'Colocar os botões',
+    why: 'Cada botão leva o +7,5 V até uma linha de comando quando é apertado. O botão FRENTE alimenta a linha FRENTE. O botão RÉ alimenta a linha RÉ.',
+    how: 'Coloque SW1 (FRENTE) e SW2 (RÉ). Ligue o terminal de cima de cada botão no trilho vermelho. Ligue a saída de SW1 na barra azul (FRENTE) e a saída de SW2 na barra laranja (RÉ).',
+    dica: 'As barras azul e laranja ficam nas bordas da bancada. Toque em qualquer ponto delas.',
+    place: ['SW1', 'SW2'],
+    items: [{ from: 'SW1.a', to: 'VCC' }, { from: 'SW2.a', to: 'VCC' }, { from: 'SW1.b', to: 'FRE' }, { from: 'SW2.b', to: 'RE' }]
+  },
+  {
+    id: 'fre', short: 'Linha FRENTE', title: 'Levar a linha FRENTE até os resistores',
+    why: 'Na folha, o rótulo FRENTE indica pontos ligados entre si. Quando você aperta FRENTE, três resistores recebem tensão: R1 (liga Q1), R4 (liga Q4) e R6 (desliga Q2 pelo intertravamento).',
+    how: 'Ligue o terminal de entrada de R1, R4 e R6 na barra azul (FRENTE).',
+    dica: 'Terminal de entrada é o que NÃO está ligado ao transistor.',
+    place: [],
+    items: [{ from: 'R1.in', to: 'FRE' }, { from: 'R4.in', to: 'FRE' }, { from: 'R6.in', to: 'FRE' }]
+  },
+  {
+    id: 're', short: 'Linha RÉ', title: 'Levar a linha RÉ até os resistores',
+    why: 'Do mesmo jeito, o rótulo RÉ indica pontos ligados entre si. Quando você aperta RÉ, recebem tensão R2 (liga Q2), R3 (liga Q3) e R5 (desliga Q1 pelo intertravamento).',
+    how: 'Ligue o terminal de entrada de R2, R3 e R5 na barra laranja (RÉ).',
+    dica: 'A barra laranja fica na borda direita da bancada.',
+    place: [],
+    items: [{ from: 'R2.in', to: 'RE' }, { from: 'R3.in', to: 'RE' }, { from: 'R5.in', to: 'RE' }]
+  },
+  {
+    id: 'teste', short: 'Teste', title: 'Testar a ponte H', extra: 'teste',
+    why: 'Circuito completo. Agora aperte os botões e observe o motor e os LEDs. Preencha a tabela da folha de atividade com o que você viu.',
+    how: 'Toque em FRENTE, em RÉ e nos dois juntos. Cada combinação testada recebe um visto.',
+    place: [], items: []
+  }
+];
+/* ========= MOTOR DA MONTAGEM: estado, fios, validação e simulação ========= */
+
+const state = {
+  step: 0,
+  placed: {},          // slot -> chave do tipo colocado (ex.: Q1 -> 'TIP122')
+  wires: [],           // [{a, b}]
+  history: [],         // desfazer: {t:'part', slot} | {t:'wire', a, b}
+  vsrc: 5.0,           // tensão ajustada na fonte
+  tested: { none: false, fre: false, re: false, both: false },
+  noInterlock: false   // experimento virtual do passo de teste
+};
+
+/* ---------- Mapas de consulta ---------- */
+const DOT = {};      // id do ponto de trilho -> {rail, x, y}
+const TRUTH = {};    // id de terminal -> chave da rede correta
+Object.keys(RAILS).forEach(r => RAILS[r].dots.forEach(([id, x, y]) => { DOT[id] = { rail: r, x, y }; TRUTH[id] = r; }));
+Object.keys(NETS).forEach(n => NETS[n].terms.forEach(t => { TRUTH[t] = n; }));
+
+function isDot(id) { return Object.prototype.hasOwnProperty.call(DOT, id); }
+function partOf(id) { return id.split('.')[0]; }
+function termOf(id) { return id.split('.')[1]; }
+function isVisible(id) {
+  if (isDot(id)) return true;
+  const p = partOf(id);
+  return !!PARTS[p] && (PARTS[p].pre || !!state.placed[p]);
+}
+function pos(id) {
+  if (isDot(id)) return [DOT[id].x, DOT[id].y];
+  return PARTS[partOf(id)].terms[termOf(id)];
+}
+function kindKey(type) {
+  const k = TYPES[type].kind;
+  return { tr220: 'TIP122', tr92: 'BC337', psu: 'fonte' }[k] || k;
+}
+function nameOf(id) {
+  if (RAILS[id]) return 'trilho ' + RAILS[id].label;
+  if (isDot(id)) return 'trilho ' + RAILS[DOT[id].rail].label;
+  const p = partOf(id), t = termOf(id);
+  const lbl = TERM_LABEL[kindKey(PARTS[p].type)][t];
+  return p + ' · ' + lbl;
+}
+/* ponto de um trilho mais próximo de um terminal (para focar e destacar) */
+function nearestDot(rail, fromId) {
+  const [fx, fy] = pos(fromId);
+  let best = null, bd = 1e9;
+  RAILS[rail].dots.forEach(([id, x, y]) => {
+    const d = Math.abs(x - fx) + Math.abs(y - fy);
+    if (d < bd) { bd = d; best = id; }
+  });
+  return best;
+}
+
+/* ---------- Conectividade (união de conjuntos) ---------- */
+function norm(id) { return RAILS[id] ? 'RAIL:' + id : (isDot(id) ? 'RAIL:' + DOT[id].rail : id); }
+function buildDSU() {
+  const parent = {};
+  const find = x => { parent[x] = parent[x] || x; while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+  state.wires.forEach(w => { const ra = find(norm(w.a)), rb = find(norm(w.b)); if (ra !== rb) parent[ra] = rb; });
+  return find;
+}
+function connected(a, b) { const f = buildDSU(); return f(norm(a)) === f(norm(b)); }
+
+/* ---------- Colocar peça ---------- */
+function placePart(slot, typeKey) {
+  const need = PARTS[slot].type;
+  if (PARTS[slot].pre) return { ok: false, msg: 'A fonte já está na bancada.' };
+  if (state.placed[slot]) return { ok: false, msg: slot + ' já tem uma peça. Use “Desfazer” se quiser trocar.' };
+  if (need !== typeKey) {
+    const n = TYPES[need], c = TYPES[typeKey];
+    let msg = 'O lugar ' + slot + ' pede ' + n.name + ' (' + n.sub + '). Você escolheu ' + c.name + ' (' + c.sub + ').';
+    if (n.kind === 'res' && c.kind === 'res') msg += ' Confira a ordem das faixas de cor.';
+    return { ok: false, msg };
+  }
+  state.placed[slot] = typeKey;
+  state.history.push({ t: 'part', slot });
+  return { ok: true };
+}
+
+/* ---------- Criar fio ---------- */
+function tryWire(a, b) {
+  if (a === b) return { ok: false, msg: 'Escolha dois terminais diferentes.' };
+  const aDot = isDot(a), bDot = isDot(b);
+  if (!aDot && !bDot && partOf(a) === partOf(b)) {
+    return { ok: false, msg: 'Os dois terminais são da mesma peça (' + partOf(a) + '). Ligar um no outro faria um curto dentro dela.' };
+  }
+  const na = TRUTH[a], nb = TRUTH[b];
+  if (na !== nb) {
+    const pair = [na, nb].sort().join('+');
+    if (pair === 'GND+VCC') {
+      return { ok: false, short: true, msg: 'CURTO-CIRCUITO. Isso ligaria o +7,5 V direto no GND. Na bancada, a fonte desligaria ou algo esquentaria muito. Escolha outro destino.' };
+    }
+    const mates = NETS[na] ? NETS[na].terms.filter(t => t !== a && isVisible(t)).slice(0, 4).map(nameOf) : [];
+    if (NETS[na] && NETS[na].rail) mates.unshift('trilho ' + RAILS[NETS[na].rail].label);
+    let msg = nameOf(a) + ' pertence ao ' + NETS[na].label + ', e ' + nameOf(b) + ' pertence ao ' + NETS[nb].label + '. Esses dois pontos não se ligam no circuito.';
+    if (mates.length) msg += ' Esse terminal se liga com: ' + mates.join('; ') + '.';
+    return { ok: false, msg };
+  }
+  if (connected(a, b)) return { ok: false, msg: 'Esses dois pontos já estão ligados, direto ou por outro fio.' };
+  state.wires.push({ a, b });
+  state.history.push({ t: 'wire', a, b });
+  return { ok: true };
+}
+
+function removeWireAt(i) { state.wires.splice(i, 1); }
+
+/* ---------- Desfazer ---------- */
+function undo() {
+  const h = state.history.pop();
+  if (!h) return null;
+  if (h.t === 'wire') {
+    const i = state.wires.findIndex(w => w.a === h.a && w.b === h.b);
+    if (i >= 0) state.wires.splice(i, 1);
+    return 'Fio removido.';
+  }
+  delete state.placed[h.slot];
+  state.wires = state.wires.filter(w => !(w.a.startsWith(h.slot + '.') || w.b.startsWith(h.slot + '.')));
+  state.history = state.history.filter(x => x.t !== 'wire' || state.wires.some(w => w.a === x.a && w.b === x.b));
+  return h.slot + ' retirado, junto com os fios ligados a ele.';
+}
+
+function resetAll() {
+  state.step = 0; state.placed = {}; state.wires = []; state.history = []; state.vsrc = 5.0;
+  state.tested = { none: false, fre: false, re: false, both: false }; state.noInterlock = false;
+}
+
+/* ---------- Estado dos passos ---------- */
+function itemDone(it) {
+  if (!isVisible(it.from)) return false;
+  if (!RAILS[it.to] && !isVisible(it.to)) return false;
+  return connected(it.from, it.to);
+}
+function stepStatus(i) {
+  const s = STEPS[i];
+  const placeDone = s.place.map(sl => state.placed[sl] === PARTS[sl].type);
+  const items = s.items.map(itemDone);
+  const extraOk = s.extra === 'fonte' ? Math.abs(state.vsrc - 7.5) < 0.01 : true;
+  const complete = placeDone.every(Boolean) && items.every(Boolean) && extraOk;
+  return { placeDone, items, extraOk, complete };
+}
+function firstPending(i) {
+  const s = STEPS[i], st = stepStatus(i);
+  const sl = s.place.find((_, k) => !st.placeDone[k]);
+  if (sl) return { kind: 'place', slot: sl };
+  const k = st.items.findIndex(d => !d);
+  if (k >= 0) return { kind: 'wire', item: s.items[k], index: k };
+  return null;
+}
+function allBuilt() { return STEPS.slice(1, STEPS.length - 1).every((_, k) => stepStatus(k + 1).complete); }
+
+/* ---------- Simulação (circuito completo) ---------- */
+const VCE_SAT = 1.1;
+function simulate(fre, re) {
+  const inter = !state.noInterlock;
+  const vs = 7.5;
+  const q = {
+    Q1: fre && !(re && inter),
+    Q2: re && !(fre && inter),
+    Q3: re,
+    Q4: fre,
+    Q5: re && inter,
+    Q6: fre && inter
+  };
+  const out = { q, vs, inter, fre, re };
+  // curto: dois transistores do mesmo lado conduzindo juntos
+  if ((q.Q1 && q.Q3) || (q.Q2 && q.Q4)) {
+    out.motor = 'curto'; out.ledV = false; out.ledR = false; out.vMotor = 0;
+    out.vce = { Q1: VCE_SAT, Q2: VCE_SAT, Q3: VCE_SAT, Q4: VCE_SAT };
+    out.msg = 'CURTO: Q1 e Q3 (e também Q2 e Q4) conduzem juntos e ligam o +7,5 V direto no GND. Sem Q5 e Q6, apertar os dois botões queima a ponte.';
+    return out;
+  }
+  let VA, VB;
+  if (q.Q1 && q.Q4)      { out.motor = 'horario';     VA = vs - VCE_SAT; VB = VCE_SAT; }
+  else if (q.Q2 && q.Q3) { out.motor = 'antihorario'; VA = VCE_SAT;      VB = vs - VCE_SAT; }
+  else if (q.Q3 && q.Q4) { out.motor = 'freio';       VA = VCE_SAT;      VB = VCE_SAT; }
+  else                   { out.motor = 'parado';      VA = 0;            VB = 0; }
+  out.ledV = VA - VB > 1.5; out.ledR = VB - VA > 1.5;
+  out.vMotor = Math.abs(VA - VB);
+  out.vce = { Q1: vs - VA, Q2: vs - VB, Q3: VA, Q4: VB };
+  out.msg = {
+    horario: 'FRENTE: Q1 e Q4 conduzem. A corrente entra pelo ponto A e sai pelo ponto B.',
+    antihorario: 'RÉ: Q2 e Q3 conduzem. A corrente entra pelo ponto B e sai pelo ponto A.',
+    freio: 'Os dois botões apertados: Q5 e Q6 desligaram Q1 e Q2. Só Q3 e Q4 conduzem, os dois lados do motor vão ao GND e ele apenas freia.',
+    parado: 'Nenhum botão apertado: todos os transistores estão desligados e o motor fica parado.'
+  }[out.motor];
+  return out;
+}
+function comboKey(fre, re) { return fre && re ? 'both' : fre ? 'fre' : re ? 're' : 'none'; }
+
+/* ---------- Salvar e restaurar (conveniência local; pode falhar sem aviso) ---------- */
+const SAVE_KEY = 'ponte-h-montagem-v1';
+function saveLocal() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({ step: state.step, placed: state.placed, wires: state.wires, history: state.history, vsrc: state.vsrc, tested: state.tested })); } catch (e) { /* sem armazenamento */ }
+}
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return false;
+    const d = JSON.parse(raw);
+    if (!d || typeof d.step !== 'number') return false;
+    state.step = Math.min(Math.max(0, d.step), STEPS.length - 1);
+    state.placed = d.placed || {}; state.wires = d.wires || []; state.history = d.history || [];
+    state.vsrc = typeof d.vsrc === 'number' ? d.vsrc : 5.0;
+    state.tested = d.tested || state.tested;
+    return true;
+  } catch (e) { return false; }
+}
+function clearLocal() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { /* ok */ } }
+/* ========= DESENHO DA BANCADA (SVG) ========= */
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('board');
+const stage = document.getElementById('stage');
+const canvasEl = document.getElementById('canvas');
+const G = {};
+const ui = { sel: null, selType: null, selWire: -1, hints: true, focusItem: null, press: { fre: false, re: false } };
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function txt(parent, x, y, str, o) {
+  o = o || {};
+  const t = el('text', { x, y, 'text-anchor': o.anchor || 'middle', 'font-size': o.size || 12, 'font-weight': o.weight || 500, class: o.cls || 'silk' }, parent);
+  if (o.fill) t.style.fill = o.fill;
+  if (o.op) t.setAttribute('opacity', o.op);
+  t.textContent = str;
+  return t;
+}
+const fmt = v => v.toFixed(1).replace('.', ',');
+
+function initBoard() {
+  svg.innerHTML = '';
+  const defs = el('defs', {}, svg);
+  const pat = el('pattern', { id: 'holes', width: 20, height: 20, patternUnits: 'userSpaceOnUse' }, defs);
+  el('circle', { cx: 10, cy: 10, r: 1.3, fill: 'rgba(255,255,255,.12)' }, pat);
+  ['bg', 'rails', 'slots', 'wires', 'parts', 'terms', 'hints', 'drag'].forEach(n => { G[n] = el('g', { id: 'g-' + n }, svg); });
+  const bg = el('rect', { x: 0, y: 0, width: BOARD.w, height: BOARD.h, rx: 14 }, G.bg);
+  bg.style.fill = 'var(--board)';
+  el('rect', { x: 0, y: 0, width: BOARD.w, height: BOARD.h, rx: 14, fill: 'url(#holes)' }, G.bg);
+  [[16, 16], [744, 16], [16, 984], [744, 984]].forEach(([x, y]) => {
+    const c = el('circle', { cx: x, cy: y, r: 7 }, G.bg); c.style.fill = 'var(--bg)'; c.style.opacity = .7;
+  });
+  txt(G.bg, 380, 978, 'PONTE H · REVISADEIRA · SELAN 2', { size: 12, op: .55, weight: 500 });
+  // trilhos
+  Object.keys(RAILS).forEach(k => {
+    const r = RAILS[k];
+    const ln = el('line', { x1: r.bar[0], y1: r.bar[1], x2: r.bar[2], y2: r.bar[3], 'stroke-width': 16, 'stroke-linecap': 'round', stroke: r.color, id: 'bar-' + k }, G.rails);
+    if (k === 'GND') {
+      ln.setAttribute('stroke', '#101010');
+      el('line', { x1: r.bar2[0], y1: r.bar2[1], x2: r.bar2[2], y2: r.bar2[3], 'stroke-width': 16, 'stroke-linecap': 'round', stroke: '#101010', id: 'bar2-GND' }, G.rails);
+      txt(G.rails, 560, 38, 'GND (igual ao de baixo)', { size: 11, weight: 600, anchor: 'start', fill: '#d8ece3' });
+    }
+    const lbl = k === 'VCC' ? [70, 108, 'start'] : k === 'GND' ? [70, 968, 'start'] : k === 'FRE' ? [30, 168, 'middle'] : [730, 168, 'middle'];
+    txt(G.rails, lbl[0], lbl[1], r.label, { size: 13, weight: 600, anchor: lbl[2], fill: k === 'FRE' ? '#8fbaff' : k === 'RE' ? '#ffb184' : k === 'VCC' ? '#ff9b93' : '#d8ece3' });
+  });
+}
+
+/* ---------- Tamanho do slot (lugar tracejado) de cada peça ---------- */
+function slotBox(slot) {
+  const p = PARTS[slot], k = TYPES[p.type].kind, x = p.cx, y = p.cy;
+  const b = { tr220: [-44, -54, 44, 76], tr92: [-42, -34, 42, 56], res: [-58, -32, 58, 30], led: [-32, -34, 32, 58], motor: [-52, -58, 52, 76], sw: [-40, -52, 40, 34] }[k];
+  return { x: x + b[0], y: y + b[1], w: b[2] - b[0], h: b[3] - b[1] };
+}
+
+/* ---------- Desenho de cada tipo de peça ---------- */
+function leadLines(g, p, from) {
+  Object.values(p.terms).forEach(([tx, ty], i) => {
+    const f = from(tx, ty, i);
+    el('line', { x1: f[0], y1: f[1], x2: tx, y2: ty, stroke: '#cfd6db', 'stroke-width': 4, 'stroke-linecap': 'round' }, g);
+  });
+}
+function drawPart(slot) {
+  const p = PARTS[slot], t = TYPES[p.type], k = t.kind, x = p.cx, y = p.cy;
+  const g = el('g', { 'data-part': slot }, G.parts);
+  if (k === 'tr220') {
+    leadLines(g, p, (tx) => [tx, y + 30]);
+    el('rect', { x: x - 38, y: y - 50, width: 76, height: 20, rx: 3, fill: '#b9c2c9', stroke: '#7d8991' }, g);
+    const h = el('circle', { cx: x, cy: y - 40, r: 5 }, g); h.style.fill = 'var(--board)';
+    const body = el('rect', { x: x - 38, y: y - 30, width: 76, height: 60, rx: 4, fill: '#1b1f23', stroke: '#4a535b', 'stroke-width': 1.5, 'data-body': slot }, g);
+    txt(g, x, y - 4, 'TIP122', { size: 15, weight: 600 });
+    txt(g, x, y + 17, slot, { size: 14, weight: 600, fill: '#ffd447' });
+  } else if (k === 'tr92') {
+    leadLines(g, p, (tx) => [tx, y + 8]);
+    el('path', { d: `M ${x - 34} ${y + 8} A 34 34 0 0 1 ${x + 34} ${y + 8} Z`, fill: '#1b1f23', stroke: '#4a535b', 'stroke-width': 1.5, 'data-body': slot }, g);
+    txt(g, x, y - 8, 'BC337', { size: 12, weight: 600 });
+    txt(g, x, y + 4, slot, { size: 11, weight: 600, fill: '#ffd447' });
+  } else if (k === 'res') {
+    el('line', { x1: x - 45, y1: y, x2: x + 45, y2: y, stroke: '#cfd6db', 'stroke-width': 4, 'stroke-linecap': 'round' }, g);
+    el('rect', { x: x - 28, y: y - 10, width: 56, height: 20, rx: 9, fill: '#d9c39a', stroke: '#8f7b52' }, g);
+    [-18, -7, 4].forEach((dx, i) => el('rect', { x: x + dx, y: y - 10, width: 6, height: 20, fill: t.bands[i] }, g));
+    el('rect', { x: x + 17, y: y - 10, width: 4, height: 20, fill: '#c9a227' }, g);
+    txt(g, x, y - 18, slot + ' · ' + t.name, { size: 12.5, weight: 600 });
+  } else if (k === 'led') {
+    leadLines(g, p, (tx) => [tx, y + 14]);
+    el('rect', { x: x - 22, y: y + 8, width: 44, height: 7, rx: 2, fill: t.color, opacity: .55 }, g);
+    const dome = el('path', { d: `M ${x - 20} ${y + 8} A 20 20 0 1 1 ${x + 20} ${y + 8} Z`, fill: t.color, opacity: .8, stroke: '#00000055', 'data-led': slot }, g);
+    dome.style.color = t.color;
+    txt(g, x, y - 32, slot, { size: 13, weight: 600, fill: '#ffd447' });
+  } else if (k === 'motor') {
+    leadLines(g, p, (tx) => [tx, y + 42]);
+    el('circle', { cx: x, cy: y, r: 46, fill: '#8e9aa3', stroke: '#4e5b65', 'stroke-width': 3 }, g);
+    el('circle', { cx: x, cy: y, r: 33, fill: '#c3ccd2' }, g);
+    txt(g, x, y + 10, 'M', { size: 30, weight: 700, fill: '#2b3a47' });
+    const rot = el('g', { id: 'rotor', style: `transform-origin:${x}px ${y}px` }, g);
+    el('rect', { x: x - 30, y: y - 4, width: 60, height: 8, rx: 4, fill: '#2b3a47', opacity: .85 }, rot);
+    el('circle', { cx: x + 26, cy: y, r: 6, fill: '#e5392f' }, rot);
+    txt(g, x, y - 52, slot + ' · Motor', { size: 12.5, weight: 600 });
+  } else if (k === 'sw') {
+    leadLines(g, p, (tx) => [tx, y - 22]);
+    el('rect', { x: x - 34, y: y - 23, width: 68, height: 46, rx: 7, fill: '#2b3a47', stroke: '#8fa1ad', 'stroke-width': 2 }, g);
+    const cap = el('circle', { cx: x, cy: y, r: 15, fill: p.caption === 'RÉ' ? '#f26d1f' : '#2f7df6', stroke: '#fff', 'stroke-width': 2, 'data-cap': slot }, g);
+    txt(g, x, y + 42, slot + ' · ' + p.caption, { size: 13, weight: 600 });
+  } else if (k === 'psu') {
+    leadLines(g, p, (tx) => [tx, y + 26]);
+    el('rect', { x: x - 70, y: y - 26, width: 140, height: 52, rx: 7, fill: '#26343f', stroke: '#8fa1ad', 'stroke-width': 2 }, g);
+    el('rect', { x: x - 54, y: y - 18, width: 108, height: 30, rx: 4, fill: '#0b1a12' }, g);
+    const over = state.vsrc > 8.001;
+    const d = txt(g, x, y + 5, fmt(state.vsrc) + ' V', { size: 21, weight: 600 });
+    d.style.fill = over ? '#ff7a6e' : '#4cff9a';
+    txt(g, x - 100, y + 4, 'FONTE', { size: 12, weight: 600, anchor: 'end', op: .8 });
+  }
+  return g;
+}
+
+/* ---------- Terminais ---------- */
+const TLABEL = {
+  tr220: { B: 'B', C: 'C', E: 'E' }, tr92: { B: 'B', C: 'C', E: 'E' },
+  res: { in: 'ent', out: 'saí' }, led: { A: 'A', K: 'K' }, motor: { p: '+', n: '−' },
+  sw: { a: 'ent', b: 'saí' }, psu: { pos: '+', neg: 'GND' }
+};
+function drawTerm(id, withLabel) {
+  const [x, y] = pos(id);
+  const g = el('g', { 'data-term': id, class: 'term' }, G.terms);
+  el('circle', { cx: x, cy: y, r: 7, class: 'term-dot' }, g);
+  if (withLabel) {
+    const p = PARTS[partOf(id)], k = TYPES[p.type].kind;
+    const l = TLABEL[k] && TLABEL[k][termOf(id)];
+    if (l) txt(g, x, k === 'sw' ? y - 13 : y + 19, l, { size: 11, cls: 'term-lbl' });
+  }
+  el('circle', { cx: x, cy: y, r: 17, class: 'term-hit', 'data-term': id }, g);
+}
+
+/* ---------- Fios ---------- */
+function wirePath(a, b) {
+  const [x1, y1] = pos(a), [x2, y2] = pos(b);
+  const dx = x2 - x1, dy = y2 - y1;
+  let c1, c2;
+  if (Math.abs(dy) >= Math.abs(dx) * 0.6) {
+    const s = dy >= 0 ? 1 : -1, h = Math.min(160, Math.abs(dy) * 0.5 + 24);
+    let bulge = 0;
+    if (Math.abs(dy) > 320) bulge = (x1 + x2) / 2 < 380 ? -60 : 60;
+    c1 = [x1 + bulge, y1 + s * h]; c2 = [x2 + bulge, y2 - s * h];
+  } else {
+    const s = dx >= 0 ? 1 : -1, h = Math.min(140, Math.abs(dx) * 0.5 + 24);
+    c1 = [x1 + s * h, y1 + 20]; c2 = [x2 - s * h, y2 + 20];
+  }
+  return `M ${x1} ${y1} C ${c1[0]} ${c1[1]}, ${c2[0]} ${c2[1]}, ${x2} ${y2}`;
+}
+function wireColor(a) { const n = NETS[TRUTH[a]]; return n ? n.color : '#fff'; }
+
+/* ---------- Renderização completa ---------- */
+function renderBoard() {
+  ['slots', 'wires', 'parts', 'terms', 'hints'].forEach(n => { G[n].innerHTML = ''; });
+  const step = STEPS[state.step];
+  const pend = (state.step >= 1 && state.step < STEPS.length - 1) ? firstPending(state.step) : null;
+  // slots vazios
+  Object.keys(PARTS).forEach(slot => {
+    const p = PARTS[slot];
+    if (p.pre || state.placed[slot]) return;
+    const b = slotBox(slot);
+    const want = step.place.includes(slot);
+    const ready = want && ui.selType;
+    const g = el('g', { 'data-slot': slot }, G.slots);
+    const r = el('rect', { x: b.x, y: b.y, width: b.w, height: b.h, rx: 10, class: 'slot' + (want ? ' want' : '') + (ready ? ' ready' : '') }, g);
+    if (want) r.classList.add('bar-hint');
+    txt(g, p.cx, p.cy + 4, slot, { size: want ? 22 : 17, weight: 700, op: want ? 1 : .55 });
+    txt(g, p.cx, p.cy + 20, TYPES[p.type].name, { size: 11, op: want ? .95 : .5 });
+  });
+  // peças
+  Object.keys(PARTS).forEach(slot => {
+    if (PARTS[slot].pre || state.placed[slot]) drawPart(slot);
+  });
+  // fios
+  state.wires.forEach((w, i) => {
+    const d = wirePath(w.a, w.b), col = wireColor(w.a);
+    const g = el('g', { 'data-wire': i }, G.wires);
+    el('path', { d, fill: 'none', stroke: ui.selWire === i ? '#fff' : 'rgba(0,0,0,.5)', 'stroke-width': ui.selWire === i ? 12 : 9, 'stroke-linecap': 'round' }, g);
+    el('path', { d, fill: 'none', stroke: col, 'stroke-width': 5, 'stroke-linecap': 'round' }, g);
+    el('path', { d, class: 'wire-hit', 'data-wire': i }, g);
+  });
+  // terminais visíveis
+  Object.keys(RAILS).forEach(k => RAILS[k].dots.forEach(([id]) => drawTerm(id, false)));
+  Object.keys(PARTS).forEach(slot => {
+    if (!(PARTS[slot].pre || state.placed[slot])) return;
+    Object.keys(PARTS[slot].terms).forEach(t => drawTerm(slot + '.' + t, true));
+  });
+  // dicas e seleção
+  const hintIds = hintTargets(pend);
+  if (ui.hints && hintIds.length) hintIds.forEach(id => ring(id, 'ring-hint'));
+  if (ui.hints && pend && pend.kind === 'wire' && RAILS[pend.item.to]) { document.getElementById('bar-' + pend.item.to).classList.add('bar-hint'); const b2 = document.getElementById('bar2-' + pend.item.to); if (b2) b2.classList.add('bar-hint'); }
+  if (ui.sel) ring(ui.sel, 'ring-sel');
+  applyTestVisuals();
+}
+function ring(id, cls) {
+  const [x, y] = pos(id);
+  el('circle', { cx: x, cy: y, r: cls === 'ring-sel' ? 14 : 11, class: cls }, G.hints);
+}
+function hintTargets(pend) {
+  if (state.step < 1 || state.step >= STEPS.length - 1) return [];
+  let item = null;
+  if (ui.focusItem != null && STEPS[state.step].items[ui.focusItem] && !itemDone(STEPS[state.step].items[ui.focusItem])) item = STEPS[state.step].items[ui.focusItem];
+  else if (pend && pend.kind === 'wire') item = pend.item;
+  if (!item) return [];
+  return [item.from, RAILS[item.to] ? nearestDot(item.to, item.from) : item.to].filter(isVisible);
+}
+
+/* ---------- Visual do teste (motor girando, LEDs, transistores) ---------- */
+function applyTestVisuals() {
+  if (state.step !== STEPS.length - 1) return;
+  const s = simulate(ui.press.fre, ui.press.re);
+  const rot = document.getElementById('rotor');
+  if (rot) { rot.classList.remove('spin-cw', 'spin-ccw'); if (s.motor === 'horario') rot.classList.add('spin-cw'); if (s.motor === 'antihorario') rot.classList.add('spin-ccw'); }
+  document.querySelectorAll('[data-led]').forEach(e => {
+    const on = e.getAttribute('data-led') === 'D1' ? s.ledV : s.ledR;
+    e.setAttribute('opacity', on ? 1 : .35);
+    if (on) e.classList.add('glow'); else e.classList.remove('glow');
+  });
+  document.querySelectorAll('[data-body]').forEach(e => {
+    const q = e.getAttribute('data-body');
+    if (s.q[q]) { e.setAttribute('stroke', '#4cff9a'); e.setAttribute('stroke-width', 4); } else { e.setAttribute('stroke', '#4a535b'); e.setAttribute('stroke-width', 1.5); }
+  });
+  document.querySelectorAll('[data-cap]').forEach(e => {
+    const pressed = e.getAttribute('data-cap') === 'SW1' ? ui.press.fre : ui.press.re;
+    e.setAttribute('r', pressed ? 11 : 15); e.setAttribute('stroke', pressed ? '#ffd447' : '#fff');
+  });
+  stage.classList.toggle('short', s.motor === 'curto');
+  ['Q5', 'Q6'].forEach(q => { const g = document.querySelector('[data-part="' + q + '"]'); if (g) g.setAttribute('opacity', state.noInterlock ? .25 : 1); });
+}
+
+/* ---------- Câmera (viewBox) com foco automático ---------- */
+let vb = { x: 0, y: 0, w: BOARD.w, h: BOARD.h }, vbAnim = 0;
+const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function applyVB() { svg.setAttribute('viewBox', vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h); }
+function insets() { return { top: 8, bottom: 8 }; }
+function viewFor(r, maxS) {
+  const cw = canvasEl.clientWidth, ch = canvasEl.clientHeight, ins = insets();
+  const ah = Math.max(60, ch - ins.top - ins.bottom);
+  let s = Math.min((cw - 16) / r.w, (ah - 8) / r.h);
+  s = Math.min(s, maxS || 1.7);
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  const w = cw / s, h = ch / s;
+  return { x: cx - w / 2, y: cy - (ins.top + ah / 2) / s, w, h };
+}
+function animateTo(t) {
+  cancelAnimationFrame(vbAnim);
+  if (reduceMotion) { vb = t; applyVB(); return; }
+  const from = { ...vb }, t0 = performance.now(), D = 380;
+  const ease = u => 1 - Math.pow(1 - u, 3);
+  const tick = now => {
+    const u = Math.min(1, (now - t0) / D), e = ease(u);
+    vb = { x: from.x + (t.x - from.x) * e, y: from.y + (t.y - from.y) * e, w: from.w + (t.w - from.w) * e, h: from.h + (t.h - from.h) * e };
+    applyVB();
+    if (u < 1) vbAnim = requestAnimationFrame(tick);
+  };
+  vbAnim = requestAnimationFrame(tick);
+}
+function boxOfIds(ids, pad) {
+  const pts = ids.map(pos);
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad, y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
+  return { x: x0, y: y0, w: Math.max(x1 - x0, 260), h: Math.max(y1 - y0, 260) };
+}
+function focusIds(ids) { animateTo(viewFor(boxOfIds(ids, 70))); }
+function focusSlots(slots) {
+  const bs = slots.map(slotBox);
+  const x0 = Math.min(...bs.map(b => b.x)) - 30, y0 = Math.min(...bs.map(b => b.y)) - 30;
+  const x1 = Math.max(...bs.map(b => b.x + b.w)) + 30, y1 = Math.max(...bs.map(b => b.y + b.h)) + 30;
+  animateTo(viewFor({ x: x0, y: y0, w: Math.max(x1 - x0, 280), h: Math.max(y1 - y0, 280) }));
+}
+function fitAll() { animateTo(viewFor({ x: 0, y: 0, w: BOARD.w, h: BOARD.h }, 1.2)); }
+function zoomBy(f, cxs, cys) {
+  const cw = canvasEl.clientWidth, ch = canvasEl.clientHeight;
+  cxs = cxs == null ? cw / 2 : cxs; cys = cys == null ? ch / 2 : cys;
+  const nw = Math.min(1500, Math.max(150, vb.w / f)), k = nw / vb.w, nh = vb.h * k;
+  const wx = vb.x + (cxs / cw) * vb.w, wy = vb.y + (cys / ch) * vb.h;
+  vb = { x: wx - (cxs / cw) * nw, y: wy - (cys / ch) * nh, w: nw, h: nh };
+  applyVB();
+}
+function clientToWorld(e) {
+  const r = svg.getBoundingClientRect();
+  return [vb.x + ((e.clientX - r.left) / r.width) * vb.w, vb.y + ((e.clientY - r.top) / r.height) * vb.h];
+}
+
+/* ---------- Ícones da gaveta ---------- */
+function partIcon(key) {
+  const t = TYPES[key], k = t.kind;
+  const lead = (x, y1, y2) => `<line x1="${x}" y1="${y1}" x2="${x}" y2="${y2}" stroke="#cfd6db" stroke-width="3"/>`;
+  let s = '<svg viewBox="0 0 100 48" aria-hidden="true">';
+  if (k === 'tr220') s += `<rect x="30" y="3" width="40" height="9" fill="#b9c2c9"/><rect x="30" y="12" width="40" height="22" rx="2" fill="#1b1f23" stroke="#5b656d"/>${lead(38, 34, 46)}${lead(50, 34, 46)}${lead(62, 34, 46)}`;
+  else if (k === 'tr92') s += `<path d="M32 30 A18 18 0 0 1 68 30 Z" fill="#1b1f23" stroke="#5b656d"/>${lead(40, 30, 46)}${lead(50, 30, 46)}${lead(60, 30, 46)}`;
+  else if (k === 'res') s += `<line x1="8" y1="24" x2="92" y2="24" stroke="#cfd6db" stroke-width="3"/><rect x="24" y="14" width="52" height="20" rx="9" fill="#d9c39a" stroke="#8f7b52"/><rect x="35" y="14" width="6" height="20" fill="${t.bands[0]}"/><rect x="45" y="14" width="6" height="20" fill="${t.bands[1]}"/><rect x="55" y="14" width="6" height="20" fill="${t.bands[2]}"/><rect x="66" y="14" width="4" height="20" fill="#c9a227"/>`;
+  else if (k === 'led') s += `${lead(42, 26, 46)}${lead(58, 26, 46)}<rect x="30" y="24" width="40" height="5" fill="${t.color}" opacity=".6"/><path d="M32 24 A18 18 0 1 1 68 24 Z" fill="${t.color}" opacity=".9"/>`;
+  else if (k === 'motor') s += `<circle cx="50" cy="24" r="20" fill="#8e9aa3" stroke="#4e5b65" stroke-width="2"/><circle cx="50" cy="24" r="13" fill="#c3ccd2"/><text x="50" y="30" text-anchor="middle" font-size="17" font-weight="700" fill="#2b3a47">M</text>`;
+  else if (k === 'sw') s += `<rect x="30" y="8" width="40" height="30" rx="5" fill="#2b3a47" stroke="#8fa1ad"/><circle cx="50" cy="23" r="10" fill="#2f7df6" stroke="#fff"/>${lead(38, 2, 8)}${lead(62, 2, 8)}`;
+  return s + '</svg>';
+}
+/* ========= INTERFACE: painel, passos, gaveta, interação e teste ========= */
+const $ = id => document.getElementById(id);
+const panel = $('panel'), tray = $('tray'), toastEl = $('toast'), statusEl = $('status');
+const LAST = STEPS.length - 1, TOTAL = STEPS.length - 2;
+let toastTimer = 0;
+
+function toast(msg, kind, ms) {
+  clearTimeout(toastTimer);
+  toastEl.className = 'toast ' + (kind || '');
+  toastEl.textContent = msg; toastEl.hidden = false;
+  toastTimer = setTimeout(() => { toastEl.hidden = true; }, ms || 6500);
+}
+toastEl.addEventListener('click', () => { toastEl.hidden = true; });
+function setStatus(msg) { statusEl.hidden = !msg; statusEl.textContent = msg || ''; }
+
+/* ---------- Passos ---------- */
+function reachable(i) {
+  for (let j = 1; j < i; j++) if (!stepStatus(j).complete) return false;
+  return true;
+}
+function renderSteps() {
+  const nav = $('steps'); nav.innerHTML = '';
+  STEPS.forEach((s, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const done = i === 0 ? state.step > 0 : (i === LAST ? false : stepStatus(i).complete);
+    b.className = 'step-chip' + (i === state.step ? ' cur' : '') + (done ? ' done' : '');
+    b.disabled = !reachable(i);
+    b.innerHTML = '<span class="n">' + (done ? '✓' : (i === 0 ? '·' : i === LAST ? '▶' : i)) + '</span>' + s.short;
+    b.addEventListener('click', () => goStep(i));
+    nav.appendChild(b);
+    if (i === state.step) setTimeout(() => b.scrollIntoView({ inline: 'center', block: 'nearest' }), 0);
+  });
+  $('progress').textContent = state.step === 0 ? 'Início' : state.step === LAST ? 'Teste' : 'Passo ' + state.step + '/' + TOTAL;
+}
+
+/* ---------- Gaveta ---------- */
+function renderTray() {
+  const s = STEPS[state.step];
+  tray.hidden = !(s.place.length > 0);
+  tray.innerHTML = '';
+  if (tray.hidden) return;
+  BIN_ORDER.forEach(key => {
+    const t = TYPES[key];
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'part-btn'; b.setAttribute('aria-pressed', ui.selType === key ? 'true' : 'false');
+    b.innerHTML = partIcon(key) + '<span class="pn">' + t.name + '</span><span class="ps">' + t.sub + '</span>';
+    b.addEventListener('click', () => {
+      ui.selType = ui.selType === key ? null : key;
+      setStatus(ui.selType ? 'Escolhido: ' + t.name + '. Toque no lugar marcado na bancada.' : null);
+      renderTray(); renderBoard();
+    });
+    tray.appendChild(b);
+  });
+}
+
+/* ---------- Painel ---------- */
+function pendingCount(i) {
+  const st = stepStatus(i);
+  return st.placeDone.filter(d => !d).length + st.items.filter(d => !d).length + (st.extraOk ? 0 : 1);
+}
+function row(done, cur, text, attrs) {
+  const tag = attrs ? 'button' : 'div';
+  return '<' + tag + ' class="row' + (done ? ' done' : '') + (cur ? ' cur' : '') + '" ' + (attrs || '') + (attrs ? ' type="button"' : '') + '><span class="ck">✓</span><span class="tx">' + text + '</span></' + tag + '>';
+}
+function tipFigure() {
+  return '<div class="fig"><svg viewBox="0 0 150 120" role="img" aria-label="TIP122 visto de frente: terminais B, C, E da esquerda para a direita">' +
+    '<rect x="35" y="4" width="80" height="22" rx="3" fill="#b9c2c9" stroke="#7d8991"/><circle cx="75" cy="15" r="5" fill="var(--surface)"/>' +
+    '<rect x="35" y="26" width="80" height="52" rx="4" fill="#1b1f23" stroke="#4a535b"/><text x="75" y="56" text-anchor="middle" font-size="15" font-weight="600" fill="#e6f2ec" font-family="IBM Plex Mono, monospace">TIP122</text>' +
+    [[45, 'B'], [75, 'C'], [105, 'E']].map(a => '<line x1="' + a[0] + '" y1="78" x2="' + a[0] + '" y2="100" stroke="#8d979f" stroke-width="4"/><text x="' + a[0] + '" y="116" text-anchor="middle" font-size="14" font-weight="600" fill="var(--ink)" font-family="IBM Plex Mono, monospace">' + a[1] + '</text>').join('') +
+    '</svg><p class="mono" style="max-width:26ch">Face com letras para você, terminais para baixo: B, C, E.</p></div>';
+}
+function psuControl() {
+  const v = state.vsrc, over = v > 8.001, ok = Math.abs(v - 7.5) < 0.01;
+  return '<div class="psu"><div class="disp' + (over ? ' over' : '') + '">' + fmt(v) + ' V</div><div class="btns">' +
+    [['−0,5', -0.5], ['−0,1', -0.1], ['+0,1', 0.1], ['+0,5', 0.5]].map(a => '<button class="btn" type="button" data-act="v" data-d="' + a[1] + '">' + a[0] + '</button>').join('') +
+    '</div></div>' +
+    (over ? '<div class="msg bad">Acima de 8 V. Na bancada isso pode queimar os componentes. Reduza a tensão.</div>'
+      : ok ? '<div class="msg ok">Fonte em 7,5 V. Pode ligar os terminais.</div>'
+        : '<div class="msg warn">Ajuste a tensão até chegar em 7,5 V.</div>');
+}
+function introExtra() {
+  const chips = ['4 × TIP122', '2 × BC337', '2 × 1 kΩ', '2 × 4,7 kΩ', '2 × 10 kΩ', '1 × 470 Ω', 'LED verde', 'LED vermelho', 'motor DC 3–6 V', '2 botões', 'fonte 7,5 V'];
+  return '<div class="list"><h3>Material da montagem</h3><div class="chips">' + chips.map(c => '<span class="chip">' + c + '</span>').join('') + '</div></div>' +
+    '<div class="msg warn">Este programa é virtual. Na bancada de verdade, ajuste a fonte em 7,5 V (nunca acima de 8 V) e desligue a fonte se algum TIP122 esquentar muito.</div>';
+}
+function testPanel() {
+  const s = simulate(ui.press.fre, ui.press.re);
+  const mot = { parado: 'parado', horario: 'horário', antihorario: 'anti-horário', freio: 'parado (freando)', curto: 'CURTO' }[s.motor];
+  const ck = k => state.tested[k] ? '✓ testado' : '—';
+  let h = '<div class="test-btns">' +
+    '<button class="big-sw" type="button" data-act="press" data-k="fre" aria-pressed="' + ui.press.fre + '">FRENTE<small>botão SW1</small></button>' +
+    '<button class="big-sw" type="button" data-act="press" data-k="re" aria-pressed="' + ui.press.re + '">RÉ<small>botão SW2</small></button></div>';
+  h += '<div class="msg ' + (s.motor === 'curto' ? 'bad' : 'ok') + '">' + s.msg + '</div>';
+  if (state.noInterlock && s.motor !== 'curto') h += '<div class="msg warn">Experimento ligado: Q5 e Q6 foram retirados. Aperte os dois botões para ver o que acontece.</div>';
+  h += '<div class="readout">' +
+    '<div class="cell"><div class="k">Motor</div><div class="v">' + mot + '</div></div>' +
+    '<div class="cell"><div class="k">LEDs</div><div class="v"><span class="led-dot g' + (s.ledV ? ' on' : '') + '"></span>verde ' + (s.ledV ? 'aceso' : 'apagado') + '<br><span class="led-dot r' + (s.ledR ? ' on' : '') + '"></span>verm. ' + (s.ledR ? 'aceso' : 'apagado') + '</div></div>' +
+    '<div class="cell"><div class="k">Tensão da fonte</div><div class="v">' + fmt(s.vs) + ' V</div></div>' +
+    '<div class="cell"><div class="k">Tensão no motor</div><div class="v">' + fmt(s.vMotor) + ' V</div></div>' +
+    '<div class="cell"><div class="k">VCE de Q1</div><div class="v">' + fmt(s.vce.Q1) + ' V</div></div>' +
+    '<div class="cell"><div class="k">VCE de Q4</div><div class="v">' + fmt(s.vce.Q4) + ' V</div></div></div>';
+  h += '<p class="mono" style="font-size:12px;color:var(--muted)">Medições da simulação. Na bancada os valores variam um pouco com o motor e a fonte.</p>';
+  h += '<div class="list"><h3>Transistores conduzindo</h3><div class="chips">' + ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6'].map(q => '<span class="chip' + (s.q[q] ? ' on' : '') + '">' + q + (s.q[q] ? ' ligado' : '') + '</span>').join('') + '</div></div>';
+  h += '<div class="list"><h3>Tabela do teste (anote na folha)</h3><table class="table-test"><tbody>' +
+    '<tr><td>Nenhum botão</td><td>' + ck('none') + '</td></tr><tr><td>FRENTE</td><td>' + ck('fre') + '</td></tr>' +
+    '<tr><td>RÉ</td><td>' + ck('re') + '</td></tr><tr><td>Os dois juntos</td><td>' + ck('both') + '</td></tr></tbody></table></div>';
+  h += '<label class="check"><input type="checkbox" id="chkInter" data-act="inter"' + (state.noInterlock ? ' checked' : '') + '><span>Experimento (só no programa): tirar Q5 e Q6 e apertar os dois botões.</span></label>';
+  h += '<div class="list"><h3>Perguntas da folha</h3><ol class="q-list"><li>Por que esse circuito se chama ponte H?</li><li>Apertando FRENTE, qual LED acendeu? E apertando RÉ? O que isso mostra sobre a corrente no motor?</li><li>A fonte está em 7,5 V, mas o motor recebe menos. Para onde vai o resto da tensão?</li><li>O que acontece quando os dois botões são apertados juntos? Por que isso é importante?</li></ol></div>';
+  return h;
+}
+function renderPanel() {
+  const i = state.step, s = STEPS[i], st = stepStatus(i);
+  const eyebrow = i === 0 ? 'Antes de começar' : i === LAST ? 'Último passo' : 'Passo ' + i + ' de ' + TOTAL;
+  const small = window.matchMedia('(max-width: 899px)').matches && i !== 0 && i !== LAST;
+  let h = '<div><div class="eyebrow">' + eyebrow + '</div><h2>' + s.title + '</h2></div>';
+  if (i === LAST) h += testPanel() + '<p>' + s.how + '</p>';
+  else h += small ? '<details class="why"><summary>Por que fazemos isso?</summary><p>' + s.why + '</p></details>' : '<p>' + s.why + '</p>';
+  if (s.how && i !== LAST) h += '<div class="todo"><b>O que fazer</b>' + s.how + '</div>';
+  if (i === 0) h += introExtra();
+  if (s.extra === 'fonte') h += psuControl();
+  if (s.extra === 'tip') h += tipFigure();
+  if (s.place.length) {
+    h += '<div class="list"><h3>Peças deste passo</h3>' + s.place.map((sl, k) => row(st.placeDone[k], false, '<b class="mono">' + sl + '</b> · ' + TYPES[PARTS[sl].type].name + ' <span class="arrow">(' + TYPES[PARTS[sl].type].sub + ')</span>')).join('') + '</div>';
+  }
+  if (s.items.length) {
+    const pend = firstPending(i);
+    h += '<div class="list"><h3>Ligações deste passo</h3>' + s.items.map((it, k) =>
+      row(st.items[k], !!pend && pend.kind === 'wire' && pend.index === k && !st.items[k],
+        nameOf(it.from) + ' <span class="arrow">→</span> ' + nameOf(it.to), 'data-act="item" data-k="' + k + '"')).join('') + '</div>';
+  }
+  if (s.dica) h += '<details class="dica"><summary>Preciso de uma dica</summary><p>' + s.dica + '</p></details>';
+  if (i !== LAST) {
+    const left = i === 0 ? 0 : pendingCount(i);
+    h += '<div class="nav"><button class="btn" type="button" data-act="back"' + (i === 0 ? ' disabled' : '') + '>Voltar</button>' +
+      '<span class="hint">' + (i === 0 ? '' : left ? 'Faltam ' + left + (left === 1 ? ' ação' : ' ações') + ' neste passo.' : 'Passo completo.') + '</span>' +
+      '<button class="btn primary" type="button" data-act="next"' + (left ? ' disabled' : '') + '>' + (i === 0 ? 'Começar' : i === LAST - 1 ? 'Ir para o teste' : 'Próximo passo') + '</button></div>';
+  } else {
+    h += '<div class="nav"><button class="btn" type="button" data-act="back">Voltar</button><span class="hint">Circuito completo.</span></div>';
+  }
+  panel.innerHTML = h;
+}
+panel.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const a = b.getAttribute('data-act');
+  if (a === 'next') goStep(state.step + 1);
+  else if (a === 'back') goStep(state.step - 1);
+  else if (a === 'v') {
+    state.vsrc = Math.min(12, Math.max(0, Math.round((state.vsrc + parseFloat(b.getAttribute('data-d'))) * 10) / 10));
+    refresh(); if (state.vsrc > 8.001) toast('Tensão acima de 8 V. Reduza antes de ligar o circuito.', 'bad');
+  } else if (a === 'item') {
+    const k = +b.getAttribute('data-k'), it = STEPS[state.step].items[k];
+    ui.focusItem = k; renderBoard(); renderPanel();
+    focusIds([it.from, RAILS[it.to] ? nearestDot(it.to, it.from) : it.to].filter(isVisible));
+  } else if (a === 'press') {
+    const k = b.getAttribute('data-k'); togglePress(k);
+    const nb = panel.querySelector('[data-k="' + k + '"]'); if (nb) nb.focus();
+  }
+});
+panel.addEventListener('change', e => {
+  if (e.target.id === 'chkInter') { state.noInterlock = e.target.checked; refresh(); }
+});
+
+/* ---------- Teste ---------- */
+function togglePress(k) {
+  ui.press[k] = !ui.press[k];
+  state.tested[comboKey(ui.press.fre, ui.press.re)] = true;
+  renderBoard(); renderPanel(); saveLocal();
+}
+
+/* ---------- Navegação e foco ---------- */
+function refresh() { renderBoard(); renderSteps(); renderTray(); renderPanel(); saveLocal(); }
+function autoFocus() {
+  const i = state.step, s = STEPS[i];
+  if (i === 0) { fitAll(); return; }
+  if (i === LAST) { animateTo(viewFor({ x: 200, y: 430, w: 360, h: 400 }, 1.4)); return; }
+  const pend = firstPending(i);
+  if (pend && pend.kind === 'place') focusSlots([pend.slot]);
+  else if (pend && pend.kind === 'wire') focusIds([pend.item.from, RAILS[pend.item.to] ? nearestDot(pend.item.to, pend.item.from) : pend.item.to].filter(isVisible));
+  else if (s.place.length) focusSlots(s.place);
+  else fitAll();
+}
+function goStep(i) {
+  if (i < 0 || i > LAST || !reachable(i)) return;
+  state.step = i; ui.sel = null; ui.selType = null; ui.selWire = -1; ui.focusItem = null;
+  if (i === LAST) { ui.press.fre = false; ui.press.re = false; state.tested.none = true; }
+  setStatus(null); toastEl.hidden = true;
+  refresh(); autoFocus();
+  panel.scrollTop = 0;
+}
+
+/* ---------- Ações na bancada ---------- */
+function afterSuccess() {
+  const i = state.step;
+  if (i >= 1 && i < LAST && stepStatus(i).complete) toast('Passo completo. Toque em “Próximo passo”.', 'ok', 4000);
+  ui.focusItem = null; refresh(); autoFocus();
+}
+function attemptWire(a, b) {
+  const r = tryWire(a, b);
+  if (!r.ok) { toast(r.msg, r.short ? 'short' : 'bad', r.short ? 7000 : 9000); refresh(); return; }
+  if (!(state.step >= 1 && state.step < LAST && stepStatus(state.step).complete)) toast('Fio ligado: ' + nameOf(a) + ' e ' + nameOf(b) + '.', 'ok', 2200);
+  afterSuccess();
+}
+function onTermTap(id) {
+  if (state.step === 0 || state.step === LAST) { toast(state.step === 0 ? 'Toque em “Começar” para iniciar a montagem.' : 'O circuito já está montado. Use os botões FRENTE e RÉ.', ''); return; }
+  ui.selWire = -1;
+  if (!ui.sel) { ui.sel = id; setStatus('Origem: ' + nameOf(id) + '. Toque no terminal de destino.'); renderBoard(); return; }
+  if (ui.sel === id) { ui.sel = null; setStatus(null); renderBoard(); return; }
+  const a = ui.sel; ui.sel = null; setStatus(null);
+  attemptWire(a, id);
+}
+function onSlotTap(slot) {
+  const s = STEPS[state.step];
+  if (!s.place.includes(slot)) {
+    const at = STEPS.findIndex(x => x.place.includes(slot));
+    toast(slot + ' será usado no passo ' + at + '. Agora siga as peças marcadas em amarelo.', 'bad'); return;
+  }
+  if (!ui.selType) { toast('Escolha a peça na gaveta e depois toque no lugar ' + slot + '.', 'bad'); return; }
+  const r = placePart(slot, ui.selType);
+  if (!r.ok) { toast(r.msg, 'bad', 9000); return; }
+  const still = s.place.some(sl => !state.placed[sl] && PARTS[sl].type === ui.selType);
+  if (!still) { ui.selType = null; setStatus(null); }
+  afterSuccess();
+}
+function undoAction() {
+  if (ui.selWire >= 0) { removeWireAt(ui.selWire); state.history = state.history.filter(h => h.t !== 'wire' || state.wires.some(w => w.a === h.a && w.b === h.b)); ui.selWire = -1; toast('Fio removido.', 'ok', 2000); refresh(); return; }
+  const m = undo();
+  if (m) toast(m, 'ok', 2500); else toast('Não há nada para desfazer.', '', 2000);
+  ui.sel = null; setStatus(null); refresh();
+}
+
+/* ---------- Gestos: toque, arrastar fio, mover e dar zoom ---------- */
+const ptrs = new Map();
+let down = null, lastPinch = null;
+const rubber = () => { G.drag.innerHTML = ''; };
+svg.addEventListener('pointerdown', e => {
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 2) { const [p, q] = [...ptrs.values()]; lastPinch = { d: Math.hypot(p.x - q.x, p.y - q.y), cx: (p.x + q.x) / 2, cy: (p.y + q.y) / 2 }; down = null; rubber(); return; }
+  const t = e.target.closest('[data-term]');
+  const base = { x: e.clientX, y: e.clientY, moved: false, vb0: { ...vb } };
+  if (t) { down = { ...base, type: 'term', id: t.getAttribute('data-term') }; return; }
+  const sl = e.target.closest('[data-slot]'), w = e.target.closest('[data-wire]'), pt = e.target.closest('[data-part]');
+  if (sl) down = { ...base, type: 'slot', slot: sl.getAttribute('data-slot') };
+  else if (w) down = { ...base, type: 'wire', wire: +w.getAttribute('data-wire') };
+  else if (pt && state.step === LAST && /^SW/.test(pt.getAttribute('data-part'))) down = { ...base, type: 'sw', part: pt.getAttribute('data-part') };
+  else down = { ...base, type: 'bg' };
+});
+svg.addEventListener('pointermove', e => {
+  if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 2 && lastPinch) {
+    const [p, q] = [...ptrs.values()], d = Math.hypot(p.x - q.x, p.y - q.y), cx = (p.x + q.x) / 2, cy = (p.y + q.y) / 2, r = svg.getBoundingClientRect();
+    cancelAnimationFrame(vbAnim);
+    zoomBy(d / lastPinch.d, cx - r.left, cy - r.top);
+    vb.x -= (cx - lastPinch.cx) * (vb.w / r.width); vb.y -= (cy - lastPinch.cy) * (vb.h / r.height); applyVB();
+    lastPinch = { d, cx, cy }; return;
+  }
+  if (!down) return;
+  const dx = e.clientX - down.x, dy = e.clientY - down.y;
+  if (!down.moved && Math.hypot(dx, dy) > 7) down.moved = true;
+  if (!down.moved) return;
+  if (down.type === 'term') {
+    rubber();
+    const [x1, y1] = pos(down.id), [x2, y2] = clientToWorld(e);
+    el('line', { x1, y1, x2, y2, stroke: '#ffd447', 'stroke-width': 5, 'stroke-linecap': 'round', 'stroke-dasharray': '2 9' }, G.drag);
+  } else {
+    cancelAnimationFrame(vbAnim);
+    const r = svg.getBoundingClientRect();
+    vb = { x: down.vb0.x - dx * (down.vb0.w / r.width), y: down.vb0.y - dy * (down.vb0.h / r.height), w: down.vb0.w, h: down.vb0.h };
+    applyVB();
+  }
+});
+function endPtr(e, cancel) {
+  ptrs.delete(e.pointerId);
+  if (ptrs.size < 2) lastPinch = null;
+  const d = down; down = null; rubber();
+  if (!d || cancel) return;
+  if (d.type === 'term') {
+    if (d.moved) {
+      const u = document.elementFromPoint(e.clientX, e.clientY), t = u && u.closest && u.closest('[data-term]');
+      ui.sel = null; setStatus(null);
+      if (t && t.getAttribute('data-term') !== d.id && state.step >= 1 && state.step < LAST) attemptWire(d.id, t.getAttribute('data-term'));
+      else renderBoard();
+    } else onTermTap(d.id);
+  } else if (!d.moved) {
+    if (d.type === 'slot') onSlotTap(d.slot);
+    else if (d.type === 'wire') { ui.selWire = ui.selWire === d.wire ? -1 : d.wire; setStatus(ui.selWire >= 0 ? 'Fio selecionado. Toque em “Remover fio” para tirar.' : null); updateUndoLabel(); renderBoard(); }
+    else if (d.type === 'sw') togglePress(d.part === 'SW1' ? 'fre' : 're');
+    else { ui.sel = null; ui.selWire = -1; setStatus(null); updateUndoLabel(); renderBoard(); }
+  }
+}
+svg.addEventListener('pointerup', e => endPtr(e, false));
+svg.addEventListener('pointercancel', e => endPtr(e, true));
+svg.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && down && down.type !== 'term') { /* mantém o arrasto */ } });
+svg.addEventListener('wheel', e => {
+  e.preventDefault(); cancelAnimationFrame(vbAnim);
+  const r = svg.getBoundingClientRect();
+  zoomBy(e.deltaY < 0 ? 1.15 : 1 / 1.15, e.clientX - r.left, e.clientY - r.top);
+}, { passive: false });
+
+function updateUndoLabel() { $('tUndo').textContent = ui.selWire >= 0 ? 'Remover fio' : 'Desfazer'; }
+
+/* ---------- Barra de ferramentas ---------- */
+$('tZoomIn').addEventListener('click', () => { cancelAnimationFrame(vbAnim); zoomBy(1.35); });
+$('tZoomOut').addEventListener('click', () => { cancelAnimationFrame(vbAnim); zoomBy(1 / 1.35); });
+$('tFit').addEventListener('click', fitAll);
+$('tUndo').addEventListener('click', () => { undoAction(); updateUndoLabel(); });
+$('tHint').addEventListener('click', () => { ui.hints = !ui.hints; $('tHint').setAttribute('aria-pressed', ui.hints); renderBoard(); });
+let resetArmed = 0;
+$('btnReset').addEventListener('click', () => {
+  const b = $('btnReset');
+  const lbl = b.querySelector('.lbl');
+  if (!resetArmed) { lbl.textContent = 'Apagar tudo? Toque de novo'; b.classList.add('armed'); resetArmed = setTimeout(() => { resetArmed = 0; lbl.textContent = 'Recomeçar'; b.classList.remove('armed'); }, 4000); return; }
+  clearTimeout(resetArmed); resetArmed = 0; lbl.textContent = 'Recomeçar'; b.classList.remove('armed');
+  resetAll(); ui.sel = null; ui.selType = null; ui.selWire = -1; ui.press = { fre: false, re: false }; clearLocal();
+  setStatus(null); toastEl.hidden = true; refresh(); autoFocus();
+});
+let rz = 0;
+window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(autoFocus, 150); });
+
+/* ---------- Início ---------- */
+initBoard();
+loadLocal();
+if (state.step === LAST && !allBuilt()) state.step = 1;
+if (!reachable(state.step)) state.step = 1;
+refresh();
+setTimeout(() => { vb = viewFor({ x: 0, y: 0, w: BOARD.w, h: BOARD.h }, 1.2); applyVB(); autoFocus(); }, 60);
+window.__app = { state, ui, tryWire, placePart, goStep, refresh, STEPS, stepStatus, attemptWire, onSlotTap, simulate };
+</script>
+
+</body>
+</html>
